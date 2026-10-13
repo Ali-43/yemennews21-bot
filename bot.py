@@ -1,6 +1,5 @@
 import tweepy, requests, xml.etree.ElementTree as ET, time, re, html, os
 
-# يقرأ من Secrets - لو ما لقاها يقرأ من القيم القديمة (للتجربة المحلية)
 API_KEY = os.environ.get("API_KEY") or "gDzUbGcMq8TDWUnw83qbHEUdT"
 API_SECRET = os.environ.get("API_SECRET") or "rYBhwjDoGMhferwimOsLDYZ1xDQDSbxW4NgoYKxV12xDDFx1Pv"
 ACCESS_TOKEN = os.environ.get("ACCESS_TOKEN") or "1692150311152943104-VinbTyLsn0PaILLgFW60H9BeHuNcm7"
@@ -26,19 +25,28 @@ def save_sent(guid):
     with open("sent.txt","a") as f: f.write(guid+"\n")
 
 def fetch(u):
-    for inst in ["https://nitter.poast.org","https://nitter.privacydev.net","https://nitter.net"]:
+    instances = ["https://nitter.poast.org","https://nitter.privacydev.net","https://nitter.net","https://nitter.woodland.cafe","https://nitter.tiekoetter.com"]
+    for inst in instances:
         try:
-            r=requests.get(f"{inst}/{u}/rss",timeout=20,headers={'User-Agent':'Mozilla/5.0'})
+            url = f"{inst}/{u}/rss"
+            print(f"Trying {url}")
+            r=requests.get(url,timeout=20,headers={'User-Agent':'Mozilla/5.0'})
+            print(f"Status {inst}: {r.status_code} len={len(r.content)}")
             if r.status_code!=200: continue
             root=ET.fromstring(r.content)
             items=[]
-            for item in root.findall('.//item')[:3]:
+            for item in root.findall('.//item')[:5]:
                 title=clean(item.findtext('title')); guid=item.findtext('guid') or item.findtext('link')
                 enc=item.find('enclosure'); media=enc.attrib.get('url') if enc is not None else None
                 text=title.split(":",1)[-1].strip() if ":" in title else title
                 if len(text)>5: items.append((text,guid,media))
-            if items: return items
-        except: continue
+            if items:
+                print(f"Found {len(items)} from {u} via {inst}")
+                return items
+        except Exception as e:
+            print(f"Fail {inst} {e}")
+            continue
+    print(f"No items for {u}")
     return []
 
 def split_text(t,lim=230):
@@ -52,10 +60,13 @@ def split_text(t,lim=230):
 
 print("✅ بدأ الفحص...")
 sent=load_sent()
+print(f"Sent history: {len(sent)}")
 new_posts=0
 for u in SOURCES:
     for text,guid,media in fetch(u):
-        if guid in sent: continue
+        if guid in sent:
+            print(f"Skip already sent {guid[:30]}")
+            continue
         chunks=split_text(text,230)
         first_text=f"{chunks[0]}\n\n{HASHTAGS}"
         try:
@@ -75,7 +86,7 @@ for u in SOURCES:
             try:
                 requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", data={"chat_id":CHANNEL_ID, "text":f"{text}\n\n{HASHTAGS}"},timeout=10)
             except: pass
-            print(f"✅ نشر من {u}: {text[:50]}")
+            print(f"✅ نشر من {u}: {text[:60]}")
             save_sent(guid)
             new_posts+=1
         except Exception as e:

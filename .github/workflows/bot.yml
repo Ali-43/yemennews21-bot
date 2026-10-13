@@ -1,28 +1,30 @@
-name: yemennews21-bot
-
+name: bot
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
   schedule:
-    - cron: '*/5 * * * *'
-
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install deps
-        run: pip install -r requirements.txt
-      - name: Run bot
+      - run: pip install -r requirements.txt
+      - run: python bot.py
         env:
           API_KEY: ${{ secrets.API_KEY }}
           API_SECRET: ${{ secrets.API_SECRET }}
           ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
           ACCESS_SECRET: ${{ secrets.ACCESS_SECRET }}
-          BEARER_TOKEN: ${{ secrets.BEARER_TOKEN }}
-        run: python bot.py
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+      - name: Save sent history
+        run: |
+          git config user.name "bot"
+          git config user.email "bot@bot.com"
+          git add sent.txt || true
+          git commit -m "update sent" || true
+          git push || true
